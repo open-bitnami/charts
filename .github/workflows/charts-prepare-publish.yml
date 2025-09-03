@@ -1,0 +1,128 @@
+name: "[CI/CD] Charts prepare and publish"
+
+on:
+  schedule:
+    - cron: "0 1 * * 1"
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: charts-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Discover charts build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      chunks: ${{ steps.finalize-matrix.outputs.chunks }}
+      has_chunks: ${{ steps.finalize-matrix.outputs.has_chunks }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Compute candidate charts
+        id: candidates
+        shell: bash
+        run: |
+          # Build records: {"chart","context","version"}
+          mapfile -t files < <(find bitnami -type f -name Chart.yaml | sort)
+          : > /tmp/all.json
+          for f in "${files[@]}"; do
+            ctx="$(dirname "$f")"
+            chart="$(awk -F': ' '$1=="name"{print $2; exit}' "$f")"
+
+            if [[ -z "$chart" ]]; then
+              echo "::warning::Missing name in $f; skipping"
+              continue
+            fi
+
+            jq -nc --arg chart "$chart" --arg ctx "$ctx" \
+              '{chart:$chart, context:$ctx}' >> /tmp/all.json
+          done
+
+          jq -cs '.' /tmp/all.json > /tmp/all_array.json
+          echo "all=$(cat /tmp/all_array.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Compute changed charts
+        id: changed
+        if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+            head_sha="${{ github.event.pull_request.head.sha }}"
+          else
+            base_sha="${{ inputs.last_main_commit }}"
+            head_sha="${{ inputs.last_bitnami_commit }}"
+          fi
+
+          changed_files="$(git diff --name-only "$base_sha" "$head_sha")"
+
+          all='${{ steps.candidates.outputs.all }}'
+          all_with_context="$(jq 'INDEX(.context)' <<<"$all")"
+
+          changed_contexts="$(
+            awk -F/ '/^bitnami\// && NF>=2 { print $1"/"$2 }' <<<"$changed_files" \
+              | sort -u \
+              | jq -R -s --argjson dict "$all_with_context" '
+                  split("\n")
+                  | map(select(length>0))
+                  | map($dict[.] // empty)
+                '
+          )"
+
+          echo "changed=$(printf %s "$changed_contexts" | jq -c .)" >> $GITHUB_OUTPUT
+
+      - name: Finalize matrix
+        id: finalize-matrix
+        shell: bash
+        run: |
+          all='${{ steps.candidates.outputs.all }}'
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" || "${{ inputs.publish_all }}" == "true" ]]; then
+            set="$all"
+          else
+            changed='${{ steps.changed.outputs.changed }}'
+            set="$(
+              jq -n --argjson all "$all" --argjson changed "$changed" '
+                ($all | INDEX(.context)) as $idx
+                | [ $changed[] | ($idx[.context]) ]
+              '
+            )"
+          fi
+
+          size=256
+          len=$(jq 'length' <<<"$set")
+          chunks="[]"
+          i=0
+          while (( i < len )); do
+            slice=$(jq -c --argjson s "$i" --argjson e "$((i+size))" '.[$s:$e]' <<<"$set")
+            payload=$(jq -cn --argjson slice "$slice" '{payload: ({include: $slice}|tostring)}')
+            chunks=$(jq -c --argjson item "$payload" '. + [$item]' <<<"$chunks")
+            i=$((i+size))
+          done
+
+          echo "chunks=$chunks" >> "$GITHUB_OUTPUT"
+          echo "has_chunks=$(jq 'length>0' <<<"$chunks")" >> "$GITHUB_OUTPUT"
+
+  publish-chunks:
+    name: Publish (all chunks)
+    needs: discover
+    if: needs.discover.outputs.has_chunks == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.discover.outputs.chunks) }}
+    uses: ./.github/workflows/charts-publish.yml
+    with:
+      matrix: ${{ matrix.payload }}
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
