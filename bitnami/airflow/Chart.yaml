@@ -11,7 +11,7 @@ annotations:
   licenses: Apache-2.0
   tanzuCategory: service
 apiVersion: v2
-appVersion: 3.0.6
+appVersion: 3.0.5
 dependencies:
 - condition: redis.enabled
   name: redis
@@ -42,4 +42,4 @@ maintainers:
 name: airflow
 sources:
 - https://github.com/bitnami/charts/tree/main/bitnami/airflow
-version: 25.0.2
+version: 25.0.3
