@@ -13,7 +13,6 @@ ref: https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.ht
 {{- else }}
 core:
   load_examples: {{ ternary "True" "False" .Values.loadExamples | squote }}
-  executor: {{ .Values.executor | quote }}
 logging:
   colored_console_log: 'False'
 metrics:
