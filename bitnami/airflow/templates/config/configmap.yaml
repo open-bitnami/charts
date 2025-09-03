@@ -14,9 +14,6 @@ ref: https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.ht
 core:
   load_examples: {{ ternary "True" "False" .Values.loadExamples | squote }}
   executor: {{ .Values.executor | quote }}
-  {{- if (include "airflow.isImageMajorVersion3" .) }}
-  execution_api_server_url: {{ printf "http://%s:%s/execution/" (include "airflow.web.fullname" .) (.Values.service.ports.http | toString)  | quote }}
-  {{- end }}
 logging:
   colored_console_log: 'False'
 metrics:
