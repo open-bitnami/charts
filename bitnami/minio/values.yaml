@@ -76,9 +76,9 @@ extraDeploy: []
 ## @param image.debug Specify if debug logs should be enabled
 ##
 image:
-  registry: docker.io
-  repository: bitnami/minio
-  tag: 2025.7.23-debian-12-r3
+  registry: ghcr.io/open-bitnami
+  repository: containers/minio
+  tag: 2025.8.13
   digest: ""
   ## Specify a imagePullPolicy
   ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
@@ -103,9 +103,9 @@ image:
 ## @param clientImage.digest MinIO&reg; Client image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag
 ##
 clientImage:
-  registry: docker.io
-  repository: bitnami/minio-client
-  tag: 2025.7.21-debian-12-r2
+  registry: ghcr.io/open-bitnami
+  repository: containers/minio-client
+  tag: 2025.8.13
   digest: ""
 ## MinIO&reg; authentication parameters
 ##
@@ -509,9 +509,9 @@ defaultInitContainers:
     ## @param defaultInitContainers.volumePermissions.image.pullSecrets "volume-permissions" init-containers' image pull secrets
     ##
     image:
-      registry: docker.io
-      repository: bitnami/os-shell
-      tag: 12-debian-12-r50
+      registry: ghcr.io/open-bitnami
+      repository: containers/os-shell
+      tag: 12
       digest: ""
       pullPolicy: IfNotPresent
       ## Optionally specify an array of imagePullSecrets.
@@ -942,9 +942,9 @@ console:
   ## @param console.image.pullSecrets MinIO&reg; Console image pull secrets
   ##
   image:
-    registry: docker.io
-    repository: bitnami/minio-object-browser
-    tag: 2.0.2-debian-12-r3
+    registry: ghcr.io/open-bitnami
+    repository: containers/minio-object-browser
+    tag: 2.0.4
     digest: ""
     ## Specify a imagePullPolicy
     ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
